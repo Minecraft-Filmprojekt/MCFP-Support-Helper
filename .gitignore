@@ -1,0 +1,9 @@
+.settings/
+bin/
+target/
+.classpath
+.project
+.stopCmnd
+.ticketInfo
+.tickets
+.token
