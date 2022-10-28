@@ -1,12 +1,12 @@
-package de.jaskerx.listeners;
+package de.jaskerx.mcfp.supporthelper.listeners;
 
 import java.io.IOException;
 import java.util.List;
 
 import org.json.JSONObject;
 
-import de.jaskerx.main.MCFPSupportHelper;
-import de.jaskerx.main.Ticket;
+import de.jaskerx.mcfp.supporthelper.main.MCFPSupportHelper;
+import de.jaskerx.mcfp.supporthelper.main.Ticket;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.MessageBuilder;
 import net.dv8tion.jda.api.Permission;
@@ -120,7 +120,6 @@ public class RawGatewayListener extends ListenerAdapter {
 							doesChannelExist = true;
 							t.sendMessage(mb.build()).queue((Message mes) -> {
 								MCFPSupportHelper.höchstesTicket++;
-								MCFPSupportHelper.refreshTicketNumberInConfig();
 								SelectMenuListener.tickets.get(MCFPSupportHelper.höchstesTicket).setUpdateMessageId(mes.getId());});
 						}
 						});
@@ -128,11 +127,9 @@ public class RawGatewayListener extends ListenerAdapter {
 					guild.getCategoriesByName("tickets", false).get(0).createTextChannel("ticket-updates").queue(c -> {
 							c.sendMessage(mb.build()).queue((Message mes) -> {
 								MCFPSupportHelper.höchstesTicket++;
-								MCFPSupportHelper.refreshTicketNumberInConfig();
 								SelectMenuListener.tickets.get(MCFPSupportHelper.höchstesTicket).setUpdateMessageId(mes.getId());});});
 				}
 				SelectMenuListener.messages.remove(user);
-				MCFPSupportHelper.refreshTicketsInConfig();
 				});
 			
 			

@@ -1,4 +1,4 @@
-package de.jaskerx.listeners;
+package de.jaskerx.mcfp.supporthelper.listeners;
 
 import java.awt.Menu;
 import java.io.IOException;
@@ -8,9 +8,9 @@ import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import de.jaskerx.main.InfoMessage;
-import de.jaskerx.main.MCFPSupportHelper;
-import de.jaskerx.main.Ticket;
+import de.jaskerx.mcfp.supporthelper.main.InfoMessage;
+import de.jaskerx.mcfp.supporthelper.main.MCFPSupportHelper;
+import de.jaskerx.mcfp.supporthelper.main.Ticket;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.MessageBuilder;
 import net.dv8tion.jda.api.Permission;
@@ -52,7 +52,7 @@ public class SelectMenuListener extends ListenerAdapter {
 	SelectOption[] options1 = new SelectOption[] {opt11, opt12, opt13, opt14};
 	SelectOption[] options2 = new SelectOption[] {opt21, opt22, opt23, opt24};
 	SelectOption[] options3 = new SelectOption[] {opt31, opt32, opt33};
-	private static boolean doesChannelExist = false;
+	String cId;
 	
 
 	@Override
@@ -67,11 +67,22 @@ public class SelectMenuListener extends ListenerAdapter {
 				SelectMenu selMenu = SelectMenu.create("error").build();
 				messages.put(event.getUser(), new InfoMessage());
 				messages.get(event.getUser()).setCreator(event.getUser().getId());
+				cId = MCFPSupportHelper.getTicketsInfo("updates-log");
+				if(cId == null) {
+					event.reply("Achtung! Es wurde kein Update-Channel festgelegt, bitte richte dich an ein Teammitglied!").setEphemeral(true).queue();
+					return;
+				}
+				if(MCFPSupportHelper.getTicketsInfo("rolle") == null) {
+					event.reply("Achtung! Es wurde keine Support-Rolle für Tickets festgelegt, bitte richte dich an ein Teammitglied!").setEphemeral(true).queue();
+					return;
+				}
+				
+				messages.get(event.getUser()).setChannel(cId);
 				
 				if (event.getSelectedOptions().get(0).getValue().equals("mc")) {
 					
 					selMenu = SelectMenu.create("menuMc")
-							.setPlaceholder("Option(en) auswÃ¤hlen")
+							.setPlaceholder("Option(en) auswählen")
 							.addOptions(opt11, opt12, opt13, opt14)
 							.setRequiredRange(1, 4)
 							.build();
@@ -80,7 +91,7 @@ public class SelectMenuListener extends ListenerAdapter {
 				} else if (event.getSelectedOptions().get(0).getValue().equals("dc")) {
 					
 					selMenu = SelectMenu.create("menuDc")
-							.setPlaceholder("Option(en) auswÃ¤hlen")
+							.setPlaceholder("Option(en) auswählen")
 							.addOptions(opt21, opt22, opt23, opt24)
 							.setRequiredRange(1, 4)
 							.build();
@@ -89,7 +100,7 @@ public class SelectMenuListener extends ListenerAdapter {
 				} else if (event.getSelectedOptions().get(0).getValue().equals("website")) {
 					
 					selMenu = SelectMenu.create("menuWebsite")
-							.setPlaceholder("Option(en) auswÃ¤hlen")
+							.setPlaceholder("Option(en) auswählen")
 							.addOptions(opt31, opt32, opt33)
 							.setRequiredRange(1, 3)
 							.build();
@@ -98,8 +109,8 @@ public class SelectMenuListener extends ListenerAdapter {
 				} else {
 					
 					//sendModal(event.getId(), event.getToken());
-					TextInput input = TextInput.create("anliegen", "Anliegen", TextInputStyle.SHORT)
-								.setRequiredRange(1, 4000)
+					TextInput input = TextInput.create("anliegen", "Anliegen", TextInputStyle.PARAGRAPH)
+								.setRequiredRange(1, 1024)
 								.setPlaceholder("Bitte beschreibe dein Anliegen")
 								.setRequired(true)
 								.build();
@@ -136,63 +147,35 @@ public class SelectMenuListener extends ListenerAdapter {
 	private void createChannel(int options[], SelectMenuInteractionEvent event) {
 		
 		Guild guild = event.getGuild();
-		boolean doesCatgoryExist = false;
 		
-		for (Category category : guild.getCategories()) {
-			if (category.getName().equals("tickets")) {
-				doesCatgoryExist = true;
-			}
-		}
-		if (!doesCatgoryExist) {
-			guild.createCategory("tickets").complete();
-		}
-		
-		List<Category> cats = guild.getCategoriesByName("tickets", false);
-		
-		String channelName = "ticket-" + (MCFPSupportHelper.hÃ¶chstesTicket + 1);
-		cats.get(0).createTextChannel(channelName).queue(channel -> {
-				channel.upsertPermissionOverride(guild.getRoleById("949647081872691250")).deny(Permission.ALL_PERMISSIONS).setAllowed(Permission.MESSAGE_SEND, Permission.VIEW_CHANNEL, Permission.MESSAGE_HISTORY).queue();
-				channel.upsertPermissionOverride(guild.getRoleById("984047393366491156")).deny(Permission.ALL_PERMISSIONS).setAllowed(Permission.MESSAGE_SEND, Permission.VIEW_CHANNEL, Permission.MESSAGE_HISTORY).queue();
-				channel.upsertPermissionOverride(event.getMember()).deny(Permission.ALL_PERMISSIONS).setAllowed(Permission.MESSAGE_SEND, Permission.VIEW_CHANNEL, Permission.MESSAGE_HISTORY).queue();
-				channel.sendMessage("!close zum SchlieÃŸen").queue();
-				channel.sendMessage(messages.get(event.getUser()).getInfoMessage()).queue();
-				event.getHook().editOriginal("Dein Ticket wurde erstellt. Du findest es hier: " + guild.getTextChannelsByName(channelName, false).get(0).getAsMention()).queue();
-				tickets.put(MCFPSupportHelper.hÃ¶chstesTicket + 1, new Ticket(messages.get(event.getUser())));
-				tickets.get(MCFPSupportHelper.hÃ¶chstesTicket + 1).setNumber(MCFPSupportHelper.hÃ¶chstesTicket + 1);
-				doesChannelExist = false;
-				EmbedBuilder eb = new EmbedBuilder();
-				eb.setTitle("Neues Ticket " + (MCFPSupportHelper.hÃ¶chstesTicket + 1));
-				eb.addField("Ersteller:", event.getUser().getAsTag() + " / " + event.getUser().getId(), false);
-				eb.addField("Kanal:", channel.getAsMention(), false);
-				eb.addField("Kategorie:", tickets.get(MCFPSupportHelper.hÃ¶chstesTicket + 1).getCategory(), false);
-				eb.addField("Genaues Thema:", tickets.get(MCFPSupportHelper.hÃ¶chstesTicket + 1).getThema(), false);
-				MessageBuilder mb;
-				if (guild.getId().equals("949642462345973831")) { //MCFP
-					mb = new MessageBuilder(guild.getRoleById("984047393366491156").getAsMention()).setEmbeds(eb.build());
-				} else if (guild.getId().equals("904443699256242227")) {
-					mb = new MessageBuilder(guild.getRoleById("951876302728753155").getAsMention()).setEmbeds(eb.build());
-				} else {
-					mb = new MessageBuilder(guild.getRoleById("758029929328672848").getAsMention()).setEmbeds(eb.build());
-				}
-				guild.getCategoriesByName("tickets", false).get(0).getTextChannels().forEach((TextChannel t) -> {
-						if (t.getName().equals("ticket-updates") || t.getName().equals("ðŸ”â€¢ticket-updates")) {
-							doesChannelExist = true;
-							t.sendMessage(mb.build()).queue((Message mes) -> {
-								MCFPSupportHelper.hÃ¶chstesTicket++;
-								MCFPSupportHelper.refreshTicketNumberInConfig();
-								tickets.get(MCFPSupportHelper.hÃ¶chstesTicket).setUpdateMessageId(mes.getId());});
-						}
-						});
-				if (!doesChannelExist) {
-					guild.getCategoriesByName("tickets", false).get(0).createTextChannel("ticket-updates").queue(c -> {
-							c.sendMessage(mb.build()).queue((Message mes) -> {
-								MCFPSupportHelper.hÃ¶chstesTicket++;
-								MCFPSupportHelper.refreshTicketNumberInConfig();
-								tickets.get(MCFPSupportHelper.hÃ¶chstesTicket).setUpdateMessageId(mes.getId());});});
-				}
-				messages.remove(event.getUser());
-				MCFPSupportHelper.refreshTicketsInConfig();
-				});
+		guild.getTextChannelById(cId).getParentCategory().createTextChannel("ticket-" + (MCFPSupportHelper.höchstesTicket + 1)).queue(channel -> {
+			channel.upsertPermissionOverride(guild.getRoleById("949642462345973831")).deny(Permission.ALL_PERMISSIONS).queue();
+			channel.upsertPermissionOverride(guild.getRoleById("950346767239643186")).deny(Permission.ALL_PERMISSIONS).setAllowed(Permission.MESSAGE_SEND, Permission.VIEW_CHANNEL, Permission.MESSAGE_HISTORY, Permission.MESSAGE_MANAGE).queue();
+			channel.upsertPermissionOverride(guild.getRoleById("949643338401857576")).deny(Permission.ALL_PERMISSIONS).setAllowed(Permission.MESSAGE_SEND, Permission.VIEW_CHANNEL, Permission.MESSAGE_HISTORY).queue();
+			channel.upsertPermissionOverride(guild.getRoleById("949647081872691250")).deny(Permission.ALL_PERMISSIONS).setAllowed(Permission.MESSAGE_SEND, Permission.VIEW_CHANNEL, Permission.MESSAGE_HISTORY).queue();
+			channel.upsertPermissionOverride(guild.getRoleById("984047393366491156")).deny(Permission.ALL_PERMISSIONS).setAllowed(Permission.MESSAGE_SEND, Permission.VIEW_CHANNEL, Permission.MESSAGE_HISTORY).queue();
+			channel.upsertPermissionOverride(event.getMember()).deny(Permission.ALL_PERMISSIONS).setAllowed(Permission.MESSAGE_SEND, Permission.VIEW_CHANNEL, Permission.MESSAGE_HISTORY).queue();
+			channel.sendMessage("!close zum Schließen").queue();
+			channel.sendMessage(messages.get(event.getUser()).getInfoMessage()).queue();
+			event.getHook().editOriginal("Dein Ticket wurde erstellt. Du findest es hier: " + channel.getAsMention()).queue();
+			tickets.put(MCFPSupportHelper.höchstesTicket + 1, new Ticket(messages.get(event.getUser())));
+			tickets.get(MCFPSupportHelper.höchstesTicket + 1).setNumber(MCFPSupportHelper.höchstesTicket + 1);
+
+			EmbedBuilder eb = new EmbedBuilder();
+			eb.setTitle("Neues Ticket " + (MCFPSupportHelper.höchstesTicket + 1));
+			eb.addField("Ersteller:", event.getUser().getAsTag() + " / " + event.getUser().getId(), false);
+			eb.addField("Kanal:", channel.getAsMention(), false);
+			eb.addField("Kategorie:", tickets.get(MCFPSupportHelper.höchstesTicket + 1).getCategory(), false);
+			eb.addField("Genaues Thema:", tickets.get(MCFPSupportHelper.höchstesTicket + 1).getThema(), false);
+			MessageBuilder mb = new MessageBuilder(guild.getRoleById(MCFPSupportHelper.getTicketsInfo("rolle")).getAsMention()).setEmbeds(eb.build());
+			
+			guild.getTextChannelById(cId).sendMessage(mb.build()).queue((Message mes) -> {
+				MCFPSupportHelper.höchstesTicket++;
+				SelectMenuListener.tickets.get(MCFPSupportHelper.höchstesTicket).setUpdateMessageId(mes.getId());
+				MCFPSupportHelper.addTicketToDb(SelectMenuListener.tickets.get(MCFPSupportHelper.höchstesTicket));});
+			
+			messages.remove(event.getUser());
+		});
 	}
 	
 	/*private void sendModal(String id, String token) {

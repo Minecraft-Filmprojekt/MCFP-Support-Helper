@@ -1,9 +1,9 @@
-package de.jaskerx.listeners;
+package de.jaskerx.mcfp.supporthelper.listeners;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import de.jaskerx.main.MCFPSupportHelper;
+import de.jaskerx.mcfp.supporthelper.main.MCFPSupportHelper;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent;

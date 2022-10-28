@@ -1,4 +1,4 @@
-package de.jaskerx.main;
+package de.jaskerx.mcfp.supporthelper.main;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.MessageBuilder;
@@ -9,6 +9,7 @@ public class InfoMessage {
 	String creator;
 	String category;
 	String thema;
+	String channel;
 	
 	public Message getInfoMessage() {
 		
@@ -34,6 +35,9 @@ public class InfoMessage {
 	public void setThema(String thema) {
 		this.thema = thema;
 	}
+	public void setChannel(String channel) {
+		this.channel = channel;
+	}
 	
 	public String getCreator() {
 		return creator;
@@ -43,6 +47,9 @@ public class InfoMessage {
 	}
 	public String getThema() {
 		return thema;
+	}
+	public String getChannel() {
+		return channel;
 	}
 	
 }

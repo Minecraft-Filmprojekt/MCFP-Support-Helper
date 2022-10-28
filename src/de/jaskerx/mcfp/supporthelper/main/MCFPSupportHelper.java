@@ -1,4 +1,4 @@
-package de.jaskerx.main;
+package de.jaskerx.mcfp.supporthelper.main;
 
 
 import java.io.BufferedReader;
@@ -12,19 +12,25 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.sql.Time;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Locale;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 import javax.security.auth.login.LoginException;
 
-import de.jaskerx.listeners.SelectMenuListener;
+import de.jaskerx.mcfp.supporthelper.listeners.SelectMenuListener;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.interactions.commands.SlashCommandInteraction;
 
 public class MCFPSupportHelper
 {
@@ -32,21 +38,21 @@ public static JDA builder;
 public static String token = "";
 public static String stopCmnd = "";
 public static int höchstesTicket = 0;
-private static int n = 0;
-private static String fileTagsSplitter = "_&-_";
-private static String fileArgsSplitter = "%&/&";
-//private static Connection con;
+private static Connection con;
+private static String url;
+private static String username;
+private static String password;
+public static String guildId;
 	
+
     public static void main(String[] args) throws LoginException, IllegalArgumentException
     {
     	
-    	//con = connectToDb();
-    	readTokenFromConfig();
-    	readStopCmndFromConfig();
-    	readTicketNumberFromConfig();
-		readTicketsFromConfig();
+    	readConfig();
+    	con = connectToDb();
+    	loadTickets();
+		
 		Status.Start();
-		//addTicketToDb(new Ticket("cr-id", "cat", "them", "creTime", "creDate", "clTime", "clDate", "cl-id"));
 	}
     
     
@@ -58,14 +64,27 @@ private static String fileArgsSplitter = "%&/&";
     	System.out.println("[" + uhrzeit +", " + datum + "]   " + obj);
     }
     
-    /*public static Connection connectToDb() {
+    private static void readConfig() {
+		
+		try(FileReader reader = new FileReader("config_mcfp.config")) {
+			Properties properties = new Properties();
+			properties.load(reader);
+			
+			token = properties.getProperty("token");
+			stopCmnd = properties.getProperty("stopCommand");
+			url = properties.getProperty("db_url");
+			username = properties.getProperty("db_username");
+			password = properties.getProperty("db_password");
+			guildId = properties.getProperty("guildId");
+			
+		} catch(Exception e) {e.printStackTrace();}
+	}
+    
+    
+    public static Connection connectToDb() {
     	
-    	try {
-			String driver = "com.mysql.cj.jdbc.Driver";
-			String url = "jdbc:mysql://127.0.0.1:3306/mcfp_support_helper";
-			String username = "DiscordBot";
-			String password = "dcdb";
-			Class.forName(driver);
+    	try {	
+    		Class.forName("org.mariadb.jdbc.Driver");
 			
 			return DriverManager.getConnection(url, username, password);
 			
@@ -74,135 +93,88 @@ private static String fileArgsSplitter = "%&/&";
 		return null;
     }
     
+    private static void loadTickets() {
+    	
+    	try {			
+			Statement insertStatement = con.createStatement();
+			ResultSet rs = insertStatement.executeQuery("SELECT * FROM open_tickets");
+			while(rs.next()) {
+				Timestamp ts = rs.getTimestamp("creationTimestamp");
+				Calendar c = Calendar.getInstance();
+				c.setTimeInMillis(ts.getTime());
+				String time = c.get(Calendar.HOUR_OF_DAY) + ":" + c.get(Calendar.MINUTE) + ":" + c.get(Calendar.SECOND);
+				String date = c.get(Calendar.DAY_OF_MONTH) + "." + (c.get(Calendar.MONTH) + 1) + "." + c.get(Calendar.YEAR);
+				Ticket t = new Ticket(rs.getString("creatorId"), rs.getString("category"), rs.getString("thema"), time, date, "", "", "", rs.getString("updateMessageId"), rs.getString("channelId"));
+				t.setNumber(rs.getInt(1));
+				SelectMenuListener.tickets.put(rs.getInt(1), t);
+			}
+			
+			String[] urlSplit = url.split("/");
+			insertStatement = con.createStatement();
+			rs = insertStatement.executeQuery("SELECT `AUTO_INCREMENT` FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='" + urlSplit[urlSplit.length - 1] + "' AND TABLE_NAME='open_tickets'");
+			if(rs.next()) höchstesTicket = rs.getInt(1) - 1;
+			
+		} catch (Exception e) {e.printStackTrace();}
+    }
+    
     public static void addTicketToDb(Ticket ticket) {
     	
     	try {
-    		//Time time = new Time(Calendar.getInstance().getTimeInMillis());
-    		//Date date = new Date(Calendar.getInstance().getTimeInMillis());
-			PreparedStatement insertStatement = con.prepareStatement("INSERT INTO open_tickets (creatorId, category, thema, creationTime, creationDate, updateMessageId) VALUES ('" + ticket.creator + "', '" + ticket.category + "', '" + ticket.thema + "', '" + ticket.creationTime + "', '" + ticket.creationDate + "', '" + ticket.updateMessageId + "')");
+    		Calendar c = Calendar.getInstance(Locale.GERMAN);
+    		int[] date = new int[3];
+    		int[] time = new int[3];
+    		for(int i = 0; i < date.length; i++) {
+    			date[i] = Integer.valueOf(ticket.creationDate.split("\\.")[i]);
+    		}
+    		for(int i = 0; i < time.length; i++) {
+    			time[i] = Integer.valueOf(ticket.creationTime.split(":")[i]);
+    		}
+    		c.set(date[2], (date[1] +11) % 12, date[0], time[0], time[1], time[2]);
+    		
+			PreparedStatement insertStatement = con.prepareStatement("INSERT INTO open_tickets (creatorId, category, thema, creationTimestamp, updateMessageId, channelId) VALUES ('" + ticket.creator + "', '" + ticket.category + "', '" + ticket.thema + "', '" + /*ticket.creationTime + "', '" + ticket.creationDate*/ new Timestamp(c.getTimeInMillis()) + "', '" + ticket.updateMessageId + "', '" + ticket.channelId + "')", Statement.RETURN_GENERATED_KEYS);
+			insertStatement.executeUpdate();
+			
+			ResultSet rs = insertStatement.getGeneratedKeys();
+			if(rs.next()) {
+				höchstesTicket = (rs.getInt(1));
+			}
+			
+		} catch (Exception e) {e.printStackTrace();}
+    }
+    
+    public static void deleteTicket(int id) {
+    	
+    	try {
+			PreparedStatement insertStatement = con.prepareStatement("DELETE FROM open_tickets WHERE id=" + id);
 			insertStatement.executeUpdate();
 			
 		} catch (Exception e) {e.printStackTrace();}
-    }*/
-    
-    public static void readStopCmndFromConfig() {
-		
-		File file = new File("stopCmnd.txt");
-    	FileReader fr;
-		try {
-			fr = new FileReader(file);
-			BufferedReader br = new BufferedReader(fr);
-			
-			stopCmnd = br.readLine();
-			br.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-    
-    public static void readTokenFromConfig() {
-		
-		File file = new File("token.txt");
-    	FileReader fr;
-		try {
-			fr = new FileReader(file);
-			BufferedReader br = new BufferedReader(fr);
-			
-			token = br.readLine();
-			br.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-    
-    public static void readTicketNumberFromConfig() {
-    	
-    	File file = new File("ticketInfo.txt");
-    	FileReader fr;
-		try {
-			fr = new FileReader(file);
-			BufferedReader br = new BufferedReader(fr);
-			
-			höchstesTicket = Integer.valueOf(br.readLine().split("hoechstesTicket: ")[1]);
-			br.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
     }
     
-    public static void refreshTicketNumberInConfig() {
+    public static void setTicketInfo(SlashCommandInteraction event, String id, String value) {
     	
-    	File file = new File("ticketInfo.txt");
-    	FileWriter fw;
-		try {
-			fw = new FileWriter(file, false);
-			BufferedWriter bw = new BufferedWriter(fw);
+    	try {
+			PreparedStatement insertStatement = con.prepareStatement("REPLACE INTO tickets_info (id, value) VALUES ('" + id + "', '" + value + "')", Statement.RETURN_GENERATED_KEYS);
 			
-			bw.flush();
-			bw.write("hoechstesTicket: " + höchstesTicket);
-			bw.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-    }
-    
-    public static void readTicketsFromConfig() {
-    	
-    	File file = new File("tickets.txt");
-    	FileReader fr;
-		try {
-			fr = new FileReader(file);
-			BufferedReader br = new BufferedReader(fr);
-
-			List<String> lines = br.lines().collect(Collectors.toList());
-			for (String line : lines) {
-				System.out.println(line);
-				SelectMenuListener.tickets.put(Integer.valueOf(line.split(fileTagsSplitter)[0]), new Ticket(
-						line.split(fileTagsSplitter)[1].split(fileArgsSplitter)[0],
-						line.split(fileTagsSplitter)[1].split(fileArgsSplitter)[1],
-						line.split(fileTagsSplitter)[1].split(fileArgsSplitter)[2],
-						line.split(fileTagsSplitter)[1].split(fileArgsSplitter)[3],
-						line.split(fileTagsSplitter)[1].split(fileArgsSplitter)[4],
-						line.split(fileTagsSplitter)[1].split(fileArgsSplitter)[5],
-						line.split(fileTagsSplitter)[1].split(fileArgsSplitter)[6],
-						line.split(fileTagsSplitter)[1].split(fileArgsSplitter)[7]));
-				SelectMenuListener.tickets.get(Integer.valueOf(line.split(fileTagsSplitter)[0])).setNumber(Integer.valueOf(line.split(fileTagsSplitter)[0]));
-				SelectMenuListener.tickets.get(Integer.valueOf(line.split(fileTagsSplitter)[0])).setUpdateMessageId(line.split(fileTagsSplitter)[1].split(fileArgsSplitter)[8]);
+			if(insertStatement.executeUpdate() != 0) {
+				event.getHook().editOriginal(id + " wurde auf " + value + " gesetzt.").queue();
 			}
-			br.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-    }
-
-	public static void refreshTicketsInConfig() {
-		
-		File file = new File("tickets.txt");
-		FileWriter fw;
-		try {
-			fw = new FileWriter(file, false);
-			BufferedWriter bw = new BufferedWriter(fw);
 			
-			bw.flush();
-			SelectMenuListener.tickets.forEach((key, value) -> {
-				if (n > 0) {
-					try {
-						bw.newLine();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}
-				try {
-					bw.write(key + fileTagsSplitter + value.creator + fileArgsSplitter + value.category + fileArgsSplitter + value.thema + fileArgsSplitter + value.creationTime + fileArgsSplitter + value.creationDate + fileArgsSplitter + value.closingTime + fileArgsSplitter + value.closingDate + fileArgsSplitter + value.closer + fileArgsSplitter + value.updateMessageId);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-				n++;
-			});
-			bw.close();
-			n = 0;
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
+		} catch (Exception e) {e.printStackTrace();}
+    }
+    
+    public static String getTicketsInfo(String id) {
+    	
+    	try {			
+			Statement insertStatement = con.createStatement();
+			ResultSet rs = insertStatement.executeQuery("SELECT value FROM tickets_info WHERE id='" + id + "'");
+			if(rs.next()) {
+				return rs.getString("value");
+			}
+			
+		} catch (Exception e) {e.printStackTrace();}
+    	
+    	return null;
+    }
+    
 }

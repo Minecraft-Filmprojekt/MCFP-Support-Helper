@@ -1,8 +1,10 @@
-package de.jaskerx.main;
+package de.jaskerx.mcfp.supporthelper.main;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+
+import javax.annotation.Nullable;
 
 import net.dv8tion.jda.api.entities.Invite.Channel;
 import net.dv8tion.jda.api.entities.MessageChannel;
@@ -24,6 +26,7 @@ public class Ticket {
 	String closingDate;
 	String closer;
 	String updateMessageId;
+	String channelId;
 	int number;
 	
 	public Ticket (InfoMessage infoMessage) {
@@ -33,9 +36,10 @@ public class Ticket {
 		thema = infoMessage.getThema();
 		creationDate = DateTimeFormatter.ofPattern("dd.MM.yyyy").format(LocalDate.now());
 		creationTime = DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalTime.now());
+		channelId = infoMessage.getChannel();
 	}
 	
-	public Ticket(String creator, String category, String thema, String creationTime, String creationDate, String closingTime, String closingDate, String closer) {
+	public Ticket(String creator, String category, String thema, String creationTime, String creationDate, String closingTime, String closingDate, String closer, @Nullable String updateMessageId, String channelId) {
 		
 		this.creator = creator;
 		this.category = category;
@@ -45,6 +49,8 @@ public class Ticket {
 		this.closingTime = closingTime;
 		this.closingDate = closingDate;
 		this.closer = closer;
+		this.updateMessageId = updateMessageId;
+		this.channelId = channelId;
 	}
 	
 	public void close(User closer) {
@@ -75,9 +81,9 @@ public class Ticket {
 				channel.sendMessageEmbeds(getClosingMessage()).queue());
 	}
 	
-	public void editUpdateMessage(MessageChannel channel) {
+	public void editUpdateMessage() {
 		
-		channel.editMessageEmbedsById(updateMessageId, getClosingMessage()).queue();
+		MCFPSupportHelper.builder.getGuildById(MCFPSupportHelper.guildId).getTextChannelById(channelId).editMessageEmbedsById(updateMessageId, getClosingMessage()).queue();
 	}
 	
 	
@@ -86,7 +92,6 @@ public class Ticket {
 	}
 	public void setUpdateMessageId(String updateMessageId) {
 		this.updateMessageId = updateMessageId;
-		MCFPSupportHelper.refreshTicketsInConfig();
 	}
 	
 	public String getCategory() {
@@ -97,6 +102,10 @@ public class Ticket {
 	}
 	public String getUpdateMessageId() {
 		return updateMessageId;
+	}
+	
+	public String getChannelId() {
+		return channelId;
 	}
 	
 }
